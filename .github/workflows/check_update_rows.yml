@@ -1,0 +1,31 @@
+name: Restrict Changed Rows Count
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+jobs:
+  restrict_rows_count:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Count changed rows
+        id: count-rows
+        run: |
+          row_count=$(git diff ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} --numstat | awk '{ add+=$1; del+=$2 } END { print add+del }')
+          echo "row_count=$row_count" >> $GITHUB_OUTPUT
+          echo "MY_OUTPUT=$row_count" >> .env
+      - name: Read output from environment file
+        run: |
+          source .env
+          echo "$MY_OUTPUT"
+      - name: Fail if row count exceeds limit
+        if: ${{ steps.count-rows.outputs.row_count > 30 }}
+        run: |
+          echo "Output [${{steps.count-rows.outputs.row_count}}]"
+          echo "Error: Row count exceeds limit of 30"
+          exit 1
